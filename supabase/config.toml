@@ -1,0 +1,7 @@
+# LINE 會直接 POST 到 Webhook，不帶 JWT，故關閉此函式的 JWT 驗證（改以 X-Line-Signature 驗證）
+[functions.line-webhook]
+verify_jwt = false
+
+# 排程／手動觸發以 CRON_SECRET 驗證，不需 JWT（避免 Invalid JWT）
+[functions.check-deadlines-notify]
+verify_jwt = false
