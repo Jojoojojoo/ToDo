@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node node_modules/typescript/bin/tsc -b && vite build",
+    "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "supabase": "supabase",
     "db:push": "supabase db push",
@@ -13,7 +13,8 @@
     "db:diff": "supabase db diff",
     "db:reset": "supabase db reset",
     "functions:deploy": "supabase functions deploy",
-    "line-test": "node scripts/trigger-line-test.mjs"
+    "line-test": "node scripts/trigger-line-test.mjs",
+    "deploy:vercel": "node scripts/deploy-vercel.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
