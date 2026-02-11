@@ -29,4 +29,16 @@
 ## 個人設定頁
 
 - **基本資料**：顯示 Email（唯讀）、可編輯顯示名稱並儲存。
-- **LINE 綁定**：綁定／已綁定／檢查綁定狀態／解除綁定。
+- **LINE 綁定**：綁定／已綁定／檢查綁定狀態／解除綁定。取得驗證碼後會顯示「加入 LINE 官方帳號」按鈕（或 QR Code），由環境變數設定，見下方。
+
+## 如何取得加好友連結與 QR Code
+
+使用者需先加 Bot 為好友才能在對話中傳送驗證碼。前端依環境變數顯示加好友入口：
+
+- **VITE_LINE_BOT_ADD_URL**（建議必填）：加好友用完整 URL。
+  - 格式：`https://line.me/R/ti/p/{Percent-encoded LINE ID}`。
+  - 範例：LINE ID 為 `@yourbot` 時設為 `https://line.me/R/ti/p/%40yourbot`（`@` 須編碼為 `%40`）。
+  - 取得方式：登入 [LINE Official Account Manager](https://manager.line.biz/) → 選擇該官方帳號 → 基本設定／帳號資訊中可查 **LINE ID**（Basic ID）。
+- **VITE_LINE_BOT_QR_URL**（選填）：QR Code 圖片網址。若在 LINE 後台取得或自架 QR 圖，可填入此變數，設定頁會多顯示「或用手機掃描 QR Code 加入」。
+
+若兩者皆未設定，頁面會顯示「請向管理員取得 LINE 官方帳號的加入連結或 QR Code」。

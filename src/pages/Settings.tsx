@@ -129,6 +129,34 @@ export default function Settings() {
           </div>
         ) : bindingCode ? (
           <div>
+            {/* 加好友入口：連結按鈕與／或 QR Code */}
+            {import.meta.env.VITE_LINE_BOT_ADD_URL ? (
+              <p style={{ marginBottom: '0.5rem' }}>
+                <a
+                  href={import.meta.env.VITE_LINE_BOT_ADD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                  style={{ display: 'inline-block', textDecoration: 'none' }}
+                >
+                  加入 LINE 官方帳號
+                </a>
+              </p>
+            ) : import.meta.env.VITE_LINE_BOT_QR_URL ? null : (
+              <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
+                請向管理員取得 LINE 官方帳號的加入連結或 QR Code。
+              </p>
+            )}
+            {import.meta.env.VITE_LINE_BOT_QR_URL && (
+              <p style={{ marginBottom: '0.5rem' }}>
+                <img
+                  src={import.meta.env.VITE_LINE_BOT_QR_URL}
+                  alt="加入 LINE 官方帳號"
+                  style={{ display: 'block', maxWidth: 160, height: 'auto' }}
+                />
+                <span style={{ fontSize: '0.85rem', color: '#666' }}>或用手機掃描 QR Code 加入</span>
+              </p>
+            )}
             <p style={{ marginBottom: '0.5rem' }}>
               請加 Bot 為好友，並在對話中傳送以下驗證碼：
             </p>
