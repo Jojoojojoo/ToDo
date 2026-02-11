@@ -11,6 +11,7 @@ export default function Layout() {
         <div>
           <Link to="/">專案列表</Link>
           <Link to="/reports" style={{ marginLeft: '1rem' }}>報表</Link>
+          <Link to="/settings" style={{ marginLeft: '1rem' }}>設定</Link>
         </div>
         <div>
           <span style={{ marginRight: '1rem' }}>

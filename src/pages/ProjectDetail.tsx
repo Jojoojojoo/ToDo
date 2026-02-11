@@ -516,7 +516,14 @@ export default function ProjectDetail() {
             </li>
             {members?.map((m) => (
               <li key={m.user_id} className="list-item">
-                <span>{m.profile?.display_name || m.profile?.email || m.user_id}</span>
+                <span>
+                  {m.profile?.display_name || m.profile?.email || m.user_id}
+                  {m.profile?.line_user_id && (
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#06c755' }} title="此帳號已綁定 LINE，可收到 LINE 截止日提醒">
+                      LINE
+                    </span>
+                  )}
+                </span>
                 <button
                   type="button"
                   className="btn btn-danger"

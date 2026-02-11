@@ -31,7 +31,7 @@ export function useExtractDeadlinesFromText() {
         const rawMsg = (body?.error ?? body?.detail ?? res.statusText) || '擷取失敗';
         const detail = body?.detail ? `（${String(body.detail).slice(0, 200)}）` : '';
         if (res.status === 429) {
-          throw new Error('Gemini API 配額已用盡。請至 Google AI Studio 檢查用量與計費，或稍後再試。' + detail);
+          throw new Error('Azure OpenAI 配額或速率已達上限。請至 Azure 入口檢查用量與計費，或稍後再試。' + detail);
         }
         throw new Error(`${rawMsg}${detail}`);
       }

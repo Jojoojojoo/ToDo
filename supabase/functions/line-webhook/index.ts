@@ -1,7 +1,10 @@
-// LINE Messaging API Webhook：接收「加好友／傳訊息」等事件，取得使用者 userId 供填入 profiles.line_user_id
+// LINE Messaging API Webhook：接收加好友／傳訊息，綁定時依驗證碼寫入 profiles.line_user_id 並回覆
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const LINE_CHANNEL_SECRET = Deno.env.get("LINE_CHANNEL_SECRET") ?? "";
+const LINE_CHANNEL_ACCESS_TOKEN = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") ?? "";
+const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 
 interface LineWebhookEvent {
   type: string;
@@ -34,6 +37,19 @@ async function verifySignature(body: string, signature: string | null, secret: s
   return expected === signature;
 }
 
+/** 回覆 LINE 訊息（若有 replyToken 且設定了 ACCESS_TOKEN） */
+async function replyLine(replyToken: string, text: string): Promise<void> {
+  if (!LINE_CHANNEL_ACCESS_TOKEN) return;
+  await fetch(LINE_REPLY_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+    },
+    body: JSON.stringify({ replyToken, messages: [{ type: "text", text }] }),
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response("OK", { status: 200 });
@@ -59,19 +75,56 @@ Deno.serve(async (req: Request) => {
     return new Response("OK", { status: 200 });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabase = supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+
   const events = body.events ?? [];
   for (const ev of events) {
-    const userId = ev.source?.userId;
-    if (userId) {
-      // 供從 Supabase Dashboard → Edge Functions → line-webhook → Logs 查看
-      console.log(
-        JSON.stringify({
-          line_user_id: userId,
-          event_type: ev.type,
-          source_type: ev.source?.type,
-          hint: "將此 line_user_id 填入 public.profiles.line_user_id",
-        })
-      );
+    const lineUserId = ev.source?.userId;
+    if (lineUserId) {
+      // 訊息事件：驗證碼綁定流程
+      if (ev.type === "message" && ev.message?.type === "text" && typeof ev.message.text === "string") {
+        const code = ev.message.text.trim();
+        if (supabase && code) {
+          const { data: row } = await supabase
+            .from("line_binding_requests")
+            .select("id, user_id")
+            .eq("code", code)
+            .gt("expires_at", new Date().toISOString())
+            .is("line_user_id", null)
+            .limit(1)
+            .maybeSingle();
+
+          if (row && (row as { id: string; user_id: string }).user_id) {
+            const r = row as { id: string; user_id: string };
+            await supabase.from("profiles").update({ line_user_id: lineUserId, updated_at: new Date().toISOString() }).eq("id", r.user_id);
+            await supabase.from("line_binding_requests").update({ line_user_id: lineUserId }).eq("id", r.id);
+            if (ev.replyToken) await replyLine(ev.replyToken, "綁定成功！您將可收到截止日提醒。");
+          } else if (ev.replyToken) {
+            await replyLine(ev.replyToken, "驗證碼錯誤或已過期，請重新取得驗證碼再試。");
+          }
+        } else {
+          // 無 DB 或非綁定流程：僅記錄供手動對照
+          console.log(
+            JSON.stringify({
+              line_user_id: lineUserId,
+              event_type: ev.type,
+              source_type: ev.source?.type,
+              hint: "將此 line_user_id 填入 public.profiles.line_user_id",
+            })
+          );
+        }
+      } else {
+        console.log(
+          JSON.stringify({
+            line_user_id: lineUserId,
+            event_type: ev.type,
+            source_type: ev.source?.type,
+            hint: "將此 line_user_id 填入 public.profiles.line_user_id",
+          })
+        );
+      }
     }
   }
 

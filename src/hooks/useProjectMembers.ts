@@ -24,7 +24,7 @@ export function useProjectMembers(projectId: string | undefined) {
       const userIds = [...new Set(members.map((m) => m.user_id))];
       const { data: profiles, error: e2 } = await supabase
         .from('profiles')
-        .select('id, display_name, email')
+        .select('id, display_name, email, line_user_id')
         .in('id', userIds);
       if (e2) throw e2;
       const profileMap = new Map<string, Profile>();

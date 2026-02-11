@@ -5,6 +5,7 @@ import Login from '@/pages/Login';
 import ProjectList from '@/pages/ProjectList';
 import ProjectDetail from '@/pages/ProjectDetail';
 import Reports from '@/pages/Reports';
+import Settings from '@/pages/Settings';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ export default function App() {
           <Route index element={<ProjectList />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

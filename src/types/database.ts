@@ -6,6 +6,7 @@ export interface Profile {
   display_name: string | null;
   email: string | null;
   line_notify_token: string | null;
+  line_user_id: string | null;
   created_at: string;
   updated_at: string;
 }
