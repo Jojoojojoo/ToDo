@@ -10,6 +10,7 @@ export default function Layout() {
       <nav className="nav">
         <div>
           <Link to="/">專案列表</Link>
+          <Link to="/reports" style={{ marginLeft: '1rem' }}>報表</Link>
         </div>
         <div>
           <span style={{ marginRight: '1rem' }}>

@@ -20,7 +20,7 @@ export function useDeadlines(projectId: string | undefined) {
   });
 }
 
-/** 新增截止日 */
+/** 新增截止日（可選 source / document_extract_id，供 Phase 3 從文件擷取寫入） */
 export function useCreateDeadline() {
   const qc = useQueryClient();
   return useMutation({
@@ -30,6 +30,8 @@ export function useCreateDeadline() {
       due_date: string;
       description?: string;
       assignee_id?: string | null;
+      source?: 'manual' | 'document_extract';
+      document_extract_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from('deadlines')
@@ -38,7 +40,8 @@ export function useCreateDeadline() {
           title: input.title,
           due_date: input.due_date,
           description: input.description ?? null,
-          source: 'manual',
+          source: input.source ?? 'manual',
+          document_extract_id: input.document_extract_id ?? null,
           assignee_id: input.assignee_id ?? null,
         })
         .select()

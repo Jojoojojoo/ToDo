@@ -4,6 +4,8 @@ import Layout from '@/components/Layout';
 import Login from '@/pages/Login';
 import ProjectList from '@/pages/ProjectList';
 import ProjectDetail from '@/pages/ProjectDetail';
+import Reports from '@/pages/Reports';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -14,8 +16,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
         <Route path="/login" element={<Login />} />
         <Route
           path="/"
@@ -27,9 +30,11 @@ export default function App() {
         >
           <Route index element={<ProjectList />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
+          <Route path="reports" element={<Reports />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

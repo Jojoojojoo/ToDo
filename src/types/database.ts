@@ -57,3 +57,32 @@ export interface NotificationLog {
   sent_at: string;
   created_at: string;
 }
+
+/** Phase 3：AI 擷取之建議截止日（Edge Function 回傳） */
+export interface SuggestedDeadline {
+  title: string;
+  due_date: string;
+  description?: string | null;
+  assignee_name?: string | null;
+}
+
+/** Phase 3：文件擷取批次紀錄 */
+export interface DocumentExtract {
+  id: string;
+  project_id: string;
+  file_name: string | null;
+  extract_result: unknown;
+  extracted_at: string;
+  created_at: string;
+  created_by: string | null;
+}
+
+/** Phase 4：專案通知規則（依專案／天數、管道） */
+export interface NotificationRule {
+  project_id: string;
+  days_before: number;
+  notify_line: boolean;
+  notify_email: boolean;
+  created_at: string;
+  updated_at: string;
+}

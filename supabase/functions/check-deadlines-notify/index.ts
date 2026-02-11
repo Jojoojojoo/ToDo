@@ -1,10 +1,11 @@
-// Phase 2: 排程檢查 N 天內到期之截止日，發送 LINE（Messaging API / Notify）與 Email（Resend）
+// Phase 2 + Phase 4: 排程檢查 N 天內到期之截止日，依專案通知規則發送 LINE/Email
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const LINE_NOTIFY_URL = "https://notify-api.line.me/api/notify";
 const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 const RESEND_API_URL = "https://api.resend.com/emails";
+const MAX_DAYS_QUERY = 31;
 
 interface DeadlineRow {
   id: string;
@@ -18,6 +19,14 @@ interface DeadlineRow {
   assignee_line_token: string | null;
   assignee_line_user_id: string | null;
   assignee_display_name: string | null;
+}
+
+/** Phase 4: 專案通知規則（無則用預設） */
+interface NotificationRuleRow {
+  project_id: string;
+  days_before: number;
+  notify_line: boolean;
+  notify_email: boolean;
 }
 
 interface Env {
@@ -58,7 +67,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const daysBefore = Math.max(0, parseInt(env.DAYS_BEFORE ?? "3", 10));
+    const defaultDaysBefore = Math.max(0, parseInt(env.DAYS_BEFORE ?? "3", 10));
     const resendApiKey = env.RESEND_API_KEY ?? "";
     const fromEmail = env.NOTIFY_FROM_EMAIL ?? "notify@resend.dev";
     const lineChannelToken = env.LINE_CHANNEL_ACCESS_TOKEN ?? "";
@@ -66,11 +75,11 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const today = new Date().toISOString().slice(0, 10);
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + daysBefore);
-    const endDateStr = endDate.toISOString().slice(0, 10);
+    const endQuery = new Date();
+    endQuery.setDate(endQuery.getDate() + MAX_DAYS_QUERY);
+    const endQueryStr = endQuery.toISOString().slice(0, 10);
 
-    // 查詢 N 天內到期且有待辦負責人的截止日，並帶出專案名稱與負責人 profile
+    // 查詢近期到期且有待辦負責人的截止日（寬範圍，再依專案規則篩選）
     const { data: deadlines, error: deadlinesError } = await supabase
       .from("deadlines")
       .select(
@@ -78,7 +87,7 @@ Deno.serve(async (req: Request) => {
       )
       .not("assignee_id", "is", null)
       .gte("due_date", today)
-      .lte("due_date", endDateStr);
+      .lte("due_date", endQueryStr);
 
     if (deadlinesError) {
       return new Response(
@@ -94,8 +103,40 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const deadlineIds = deadlines.map((d: { id: string }) => d.id);
-    const assigneeIds = [...new Set(deadlines.map((d: { assignee_id: string }) => d.assignee_id))];
+    // Phase 4: 依專案規則篩選到期日範圍
+    const projectIds = [...new Set(deadlines.map((d: { project_id: string }) => d.project_id))];
+    const { data: rulesData } = await supabase
+      .from("notification_rules")
+      .select("project_id, days_before, notify_line, notify_email")
+      .in("project_id", projectIds);
+    const ruleMap = new Map<string, NotificationRuleRow>();
+    for (const r of rulesData ?? []) {
+      ruleMap.set((r as NotificationRuleRow).project_id, r as NotificationRuleRow);
+    }
+    function getRule(projectId: string): NotificationRuleRow {
+      return ruleMap.get(projectId) ?? {
+        project_id: projectId,
+        days_before: defaultDaysBefore,
+        notify_line: true,
+        notify_email: true,
+      };
+    }
+    const todayDate = new Date(today);
+    const filteredDeadlines = deadlines.filter((d: { project_id: string; due_date: string }) => {
+      const rule = getRule(d.project_id);
+      const cutoff = new Date(todayDate);
+      cutoff.setDate(cutoff.getDate() + rule.days_before);
+      const due = new Date(d.due_date);
+      return due <= cutoff;
+    });
+    if (!filteredDeadlines.length) {
+      return new Response(
+        JSON.stringify({ ok: true, message: "No deadlines in range (per project rules)", sent: 0, sent_line: 0, sent_email: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const deadlineIds = filteredDeadlines.map((d: { id: string }) => d.id);
+    const assigneeIds = [...new Set(filteredDeadlines.map((d: { assignee_id: string }) => d.assignee_id))];
 
     const { data: profiles } = await supabase
       .from("profiles")
@@ -121,7 +162,7 @@ Deno.serve(async (req: Request) => {
       sentToday.add(`${(log as { deadline_id: string }).deadline_id}:${(log as { channel: string }).channel}`);
     }
 
-    const rows: DeadlineRow[] = deadlines.map((d: { id: string; project_id: string; title: string; due_date: string; description: string | null; assignee_id: string; projects: { name: string } | null }) => {
+    const rows: DeadlineRow[] = filteredDeadlines.map((d: { id: string; project_id: string; title: string; due_date: string; description: string | null; assignee_id: string; projects: { name: string } | null }) => {
       const proj = d.projects;
       const profile = profileMap.get(d.assignee_id);
       return {
@@ -145,13 +186,15 @@ Deno.serve(async (req: Request) => {
     const emailErrors: { to: string; status: number; detail?: string }[] = [];
 
     for (const row of rows) {
+      const rule = getRule(row.project_id);
       const lineKey = `${row.id}:line`;
       const emailKey = `${row.id}:email`;
 
       const message = `【截止日提醒】專案「${row.project_name}」\n標題：${row.title}\n截止日：${row.due_date}${row.description ? "\n說明：" + row.description : ""}`;
 
+      // 僅在規則允許時發送 LINE
       // 優先：LINE Messaging API（需 LINE_CHANNEL_ACCESS_TOKEN + profile.line_user_id）
-      if (lineChannelToken && row.assignee_line_user_id && !sentToday.has(lineKey)) {
+      if (rule.notify_line && lineChannelToken && row.assignee_line_user_id && !sentToday.has(lineKey)) {
         const lineRes = await fetch(LINE_PUSH_URL, {
           method: "POST",
           headers: {
@@ -175,7 +218,7 @@ Deno.serve(async (req: Request) => {
         }
       }
       // 備援：LINE Notify（profile.line_notify_token）
-      else if (row.assignee_line_token && !sentToday.has(lineKey)) {
+      else if (rule.notify_line && row.assignee_line_token && !sentToday.has(lineKey)) {
         const lineRes = await fetch(LINE_NOTIFY_URL, {
           method: "POST",
           headers: { Authorization: `Bearer ${row.assignee_line_token}`, "Content-Type": "application/x-www-form-urlencoded" },
@@ -193,7 +236,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      if (row.assignee_email && resendApiKey && !sentToday.has(emailKey)) {
+      if (rule.notify_email && row.assignee_email && resendApiKey && !sentToday.has(emailKey)) {
         const emailRes = await fetch(RESEND_API_URL, {
           method: "POST",
           headers: {

@@ -5,3 +5,7 @@ verify_jwt = false
 # 排程／手動觸發以 CRON_SECRET 驗證，不需 JWT（避免 Invalid JWT）
 [functions.check-deadlines-notify]
 verify_jwt = false
+
+# Phase 3：暫時關閉 JWT 驗證以排除 401（除錯用，上線前可改回 true）
+[functions.extract-deadlines]
+verify_jwt = false

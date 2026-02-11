@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject } from '@/hooks/useProject';
 import {
@@ -7,10 +7,13 @@ import {
   useUpdateDeadline,
   useDeleteDeadline,
 } from '@/hooks/useDeadlines';
+import { useExtractDeadlinesFromText, useConfirmSuggestedDeadlines } from '@/hooks/useDocumentExtract';
 import { useProjectMembers, useAddProjectMember, useRemoveProjectMember } from '@/hooks/useProjectMembers';
+import { useNotificationRule, useUpsertNotificationRule, getDefaultRule } from '@/hooks/useNotificationRules';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { Deadline } from '@/types/database';
+import { extractTextFromFile } from '@/lib/extractFileText';
+import type { Deadline, SuggestedDeadline } from '@/types/database';
 
 function formatDate(s: string) {
   return new Date(s).toLocaleDateString('zh-TW', {
@@ -18,6 +21,86 @@ function formatDate(s: string) {
     month: '2-digit',
     day: '2-digit',
   });
+}
+
+/** Phase 4：專案通知規則表單（僅 owner 顯示） */
+function NotificationRuleForm({
+  rule,
+  defaultRule,
+  onSave,
+  isPending,
+  error,
+}: {
+  projectId: string;
+  rule: { days_before: number; notify_line: boolean; notify_email: boolean } | null;
+  defaultRule: { days_before: number; notify_line: boolean; notify_email: boolean };
+  onSave: (v: { days_before: number; notify_line: boolean; notify_email: boolean }) => Promise<unknown>;
+  isPending: boolean;
+  error: Error | null;
+}) {
+  const [days, setDays] = useState(rule?.days_before ?? defaultRule.days_before);
+  const [notifyLine, setNotifyLine] = useState(rule?.notify_line ?? defaultRule.notify_line);
+  const [notifyEmail, setNotifyEmail] = useState(rule?.notify_email ?? defaultRule.notify_email);
+
+  useEffect(() => {
+    if (rule !== null) {
+      setDays(rule.days_before);
+      setNotifyLine(rule.notify_line);
+      setNotifyEmail(rule.notify_email);
+    } else {
+      setDays(defaultRule.days_before);
+      setNotifyLine(defaultRule.notify_line);
+      setNotifyEmail(defaultRule.notify_email);
+    }
+  }, [rule, defaultRule.days_before, defaultRule.notify_line, defaultRule.notify_email]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await onSave({ days_before: days, notify_line: notifyLine, notify_email: notifyEmail });
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="form-group">
+        <label>幾天內到期時提醒</label>
+        <input
+          type="number"
+          min={0}
+          max={365}
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value) || 0)}
+        />
+      </div>
+      <div className="form-group" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <input
+            type="checkbox"
+            checked={notifyLine}
+            onChange={(e) => setNotifyLine(e.target.checked)}
+          />
+          LINE
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <input
+            type="checkbox"
+            checked={notifyEmail}
+            onChange={(e) => setNotifyEmail(e.target.checked)}
+          />
+          Email
+        </label>
+      </div>
+      <div className="form-actions">
+        <button type="submit" className="btn btn-primary" disabled={isPending}>
+          {isPending ? '儲存中…' : '儲存規則'}
+        </button>
+      </div>
+      {error && (
+        <div className="error" style={{ marginTop: '0.5rem' }}>
+          {error instanceof Error ? error.message : '儲存失敗'}
+        </div>
+      )}
+    </form>
+  );
 }
 
 function DeadlineForm({
@@ -126,6 +209,16 @@ export default function ProjectDetail() {
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  // Phase 3：從文件擷取
+  const [extractText, setExtractText] = useState('');
+  const [extractFileName, setExtractFileName] = useState<string | null>(null);
+  const [suggestedDeadlines, setSuggestedDeadlines] = useState<SuggestedDeadline[]>([]);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
+  const extractFromText = useExtractDeadlinesFromText();
+  const confirmSuggested = useConfirmSuggestedDeadlines();
+  const { data: notificationRule } = useNotificationRule(projectId);
+  const upsertRule = useUpsertNotificationRule(projectId);
+  const defaultRule = getDefaultRule();
 
   if (projectLoading || !projectId) {
     return <div>載入中…</div>;
@@ -256,6 +349,149 @@ export default function ProjectDetail() {
           </ul>
         )}
       </div>
+
+      {/* Phase 3：從文件擷取截止日 */}
+      <div className="card">
+        <h3>從文件擷取截止日</h3>
+        <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
+          貼上文字或上傳 .txt / .pdf，由 AI 辨識專案／里程碑／截止日後，可勾選並寫入上方截止日列表。
+        </p>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.25rem' }}>文字或選擇檔案</label>
+          <textarea
+            value={extractText}
+            onChange={(e) => setExtractText(e.target.value)}
+            placeholder="貼上文件內容，或選擇 .txt / .pdf 檔案後會自動填入"
+            rows={5}
+            style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
+          />
+          <input
+            type="file"
+            accept=".txt,.pdf"
+            style={{ marginTop: '0.5rem' }}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setExtractFileName(f.name);
+              try {
+                const text = await extractTextFromFile(f);
+                setExtractText(text);
+              } catch (err) {
+                alert(err instanceof Error ? err.message : '讀取檔案失敗');
+              }
+              e.target.value = '';
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!extractText.trim() || extractFromText.isPending}
+          onClick={async () => {
+            setSuggestedDeadlines([]);
+            setSelectedSuggestions(new Set());
+            try {
+              const list = await extractFromText.mutateAsync(extractText.trim());
+              setSuggestedDeadlines(list);
+              setSelectedSuggestions(new Set(list.map((_, i) => i)));
+            } catch (err) {
+              alert(err instanceof Error ? err.message : '擷取失敗');
+            }
+          }}
+        >
+          {extractFromText.isPending ? '擷取中…' : '開始擷取'}
+        </button>
+        {extractFromText.error && (
+          <div className="error" style={{ marginTop: '0.5rem' }}>
+            {extractFromText.error instanceof Error ? extractFromText.error.message : '擷取失敗'}
+          </div>
+        )}
+
+        {suggestedDeadlines.length > 0 && (
+          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+            <h4 style={{ marginBottom: '0.5rem' }}>建議截止日（可勾選後一併寫入）</h4>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {suggestedDeadlines.map((s, i) => (
+                <li key={i} className="list-item" style={{ alignItems: 'flex-start' }}>
+                  <label style={{ display: 'flex', gap: '0.5rem', flex: 1, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSuggestions.has(i)}
+                      onChange={() => {
+                        setSelectedSuggestions((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(i)) next.delete(i);
+                          else next.add(i);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>
+                      <strong>{s.title}</strong>
+                      <span style={{ marginLeft: '0.5rem' }} className="badge">{s.due_date}</span>
+                      {s.description && (
+                        <span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>
+                          {s.description}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={selectedSuggestions.size === 0 || confirmSuggested.isPending || !user?.id}
+                onClick={async () => {
+                  const selected = suggestedDeadlines.filter((_, i) => selectedSuggestions.has(i));
+                  if (selected.length === 0) return;
+                  try {
+                    await confirmSuggested.mutateAsync({
+                      project_id: projectId!,
+                      file_name: extractFileName ?? undefined,
+                      suggestions: selected,
+                      created_by: user!.id,
+                    });
+                    setSuggestedDeadlines([]);
+                    setSelectedSuggestions(new Set());
+                    setExtractText('');
+                    setExtractFileName(null);
+                  } catch (err) {
+                    alert(err instanceof Error ? err.message : '寫入失敗');
+                  }
+                }}
+              >
+                {confirmSuggested.isPending ? '寫入中…' : `確認寫入選取（${selectedSuggestions.size} 筆）`}
+              </button>
+            </div>
+            {confirmSuggested.error && (
+              <div className="error" style={{ marginTop: '0.5rem' }}>
+                {confirmSuggested.error instanceof Error ? confirmSuggested.error.message : '寫入失敗'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Phase 4：通知規則（僅 owner 可編輯） */}
+      {isOwner && (
+        <div className="card">
+          <h3>通知規則</h3>
+          <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
+            排程檢查時，依此設定「幾天內到期」發送 LINE／Email 提醒負責人。未設定時使用系統預設（3 天、雙管道）。
+          </p>
+          <NotificationRuleForm
+            projectId={projectId!}
+            rule={notificationRule ?? null}
+            defaultRule={defaultRule}
+            onSave={upsertRule.mutateAsync}
+            isPending={upsertRule.isPending}
+            error={upsertRule.error}
+          />
+        </div>
+      )}
 
       {/* 成員區塊（僅 owner 可管理） */}
       {isOwner && (
