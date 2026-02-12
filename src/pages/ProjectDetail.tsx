@@ -8,7 +8,7 @@ import {
   useDeleteDeadline,
 } from '@/hooks/useDeadlines';
 import { useExtractDeadlinesFromText, useConfirmSuggestedDeadlines } from '@/hooks/useDocumentExtract';
-import { useProjectMembers, useAddProjectMember, useRemoveProjectMember } from '@/hooks/useProjectMembers';
+import { useProjectMembers, useAddProjectMember, useRemoveProjectMember, useInviteProfiles } from '@/hooks/useProjectMembers';
 import { useNotificationRule, useUpsertNotificationRule, getDefaultRule } from '@/hooks/useNotificationRules';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -209,6 +209,8 @@ export default function ProjectDetail() {
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [showInvitePicker, setShowInvitePicker] = useState(false);
+  const { data: inviteProfiles, isLoading: inviteProfilesLoading } = useInviteProfiles(projectId, showInvitePicker);
   // Phase 3：從文件擷取
   const [extractText, setExtractText] = useState('');
   const [extractFileName, setExtractFileName] = useState<string | null>(null);
@@ -497,19 +499,85 @@ export default function ProjectDetail() {
       {isOwner && (
         <div className="card">
           <h3>專案成員</h3>
-          <form onSubmit={handleAddMember} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <form onSubmit={handleAddMember} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <input
               type="email"
               placeholder="成員 Email"
               value={newMemberEmail}
               onChange={(e) => setNewMemberEmail(e.target.value)}
               className="form-group"
-              style={{ flex: 1, padding: '0.5rem' }}
+              style={{ flex: 1, minWidth: '12rem', padding: '0.5rem' }}
             />
             <button type="submit" className="btn btn-primary" disabled={addMember.isPending}>
               新增成員
             </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setShowInvitePicker(true)}
+              disabled={addMember.isPending}
+            >
+              從名單選擇
+            </button>
           </form>
+          {showInvitePicker && (
+            <div className="card" style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--bg-secondary, #f5f5f5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <strong>選擇要加入的成員</strong>
+                <button type="button" className="btn" onClick={() => setShowInvitePicker(false)}>
+                  關閉
+                </button>
+              </div>
+              {inviteProfilesLoading ? (
+                <p style={{ color: '#666' }}>載入名單中…</p>
+              ) : !inviteProfiles?.length ? (
+                <p style={{ color: '#666' }}>沒有可邀請的成員（所有人已在專案內或尚未註冊）。</p>
+              ) : (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '12rem', overflowY: 'auto' }}>
+                  {inviteProfiles.map((p) => (
+                    <li
+                      key={p.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.5rem 0',
+                        borderBottom: '1px solid #eee',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <span>
+                        {p.display_name || p.email || p.id}
+                        {p.has_line && (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#06c755' }} title="已綁定 LINE">
+                            LINE
+                          </span>
+                        )}
+                        {p.email && (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#666' }}>{p.email}</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={addMember.isPending}
+                        onClick={async () => {
+                          try {
+                            await addMember.mutateAsync({ projectId: projectId!, userId: p.id });
+                            setShowInvitePicker(false);
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : '新增成員失敗');
+                          }
+                        }}
+                      >
+                        加入
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             <li className="list-item">
               <span>建立者（您）</span>

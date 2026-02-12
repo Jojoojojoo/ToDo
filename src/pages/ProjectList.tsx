@@ -85,6 +85,7 @@ export default function ProjectList() {
   if (isLoading) return <div>載入專案中…</div>;
   if (error) return <div className="error">載入失敗：{String(error)}</div>;
 
+  const list = Array.isArray(projects) ? projects : [];
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -119,13 +120,13 @@ export default function ProjectList() {
         </div>
       )}
 
-      {projects?.length === 0 && !showForm && (
+      {list.length === 0 && !showForm && (
         <div className="card">
           <p>尚無專案，請點「新增專案」建立。</p>
         </div>
       )}
 
-      {projects?.map((p) => (
+      {list.map((p) => (
         <div key={p.id} className="card list-item">
           <div>
             <Link to={`/projects/${p.id}`} style={{ fontWeight: 600, marginRight: '0.5rem' }}>

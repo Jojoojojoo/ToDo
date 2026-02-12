@@ -62,6 +62,29 @@ export function useAddProjectMember() {
   });
 }
 
+/** 可邀請成員（RPC：排除已在專案內者，僅專案 owner 可呼叫） */
+export interface InviteProfile {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+  has_line: boolean;
+}
+
+export function useInviteProfiles(projectId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['inviteProfiles', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const { data, error } = await supabase.rpc('list_profiles_for_invite', {
+        p_project_id: projectId,
+      });
+      if (error) throw error;
+      return (data ?? []) as InviteProfile[];
+    },
+    enabled: !!projectId && enabled,
+  });
+}
+
 /** 移除專案成員 */
 export function useRemoveProjectMember() {
   const qc = useQueryClient();

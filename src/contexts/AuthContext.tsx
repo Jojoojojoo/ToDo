@@ -26,8 +26,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
-      else setProfile(null);
+      if (s?.user) {
+        fetchProfile(s.user.id).catch(() => setProfile(null));
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
@@ -36,20 +39,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
-      else setProfile(null);
+      if (s?.user) {
+        fetchProfile(s.user.id).catch(() => setProfile(null));
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  /** 取得使用者 profile；失敗時設為 null，避免未處理的 Promise 導致當掉 */
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    setProfile(data as Profile | null);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) {
+        console.warn('[AuthContext] fetchProfile error:', error.message);
+        setProfile(null);
+        return;
+      }
+      setProfile(data as Profile | null);
+    } catch (e) {
+      console.warn('[AuthContext] fetchProfile exception:', e);
+      setProfile(null);
+    }
   }
 
   async function signIn(email: string, password: string) {

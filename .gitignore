@@ -17,3 +17,5 @@ dist/
 
 # Supabase 本機
 .supabase/
+.vercel
+.env*.local

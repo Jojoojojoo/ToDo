@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Project } from '@/types/database';
 
-/** 取得目前使用者可存取的專案列表 */
+/** 取得目前使用者可存取的專案列表；一律回傳陣列，避免渲染時當掉 */
 export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
@@ -12,7 +12,7 @@ export function useProjects() {
         .select('*')
         .order('updated_at', { ascending: false });
       if (error) throw error;
-      return data as Project[];
+      return Array.isArray(data) ? (data as Project[]) : [];
     },
   });
 }
