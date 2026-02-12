@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
 import type { Project } from '@/types/database';
 
@@ -79,8 +79,8 @@ function ProjectForm({
 export default function ProjectList() {
   const { data: projects, isLoading, error } = useProjects();
   const deleteProject = useDeleteProject();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Project | null>(null);
 
   if (isLoading) return <div>載入專案中…</div>;
   if (error) return <div className="error">載入失敗：{String(error)}</div>;
@@ -93,30 +93,16 @@ export default function ProjectList() {
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() => {
-            setEditing(null);
-            setShowForm(true);
-          }}
+          onClick={() => setShowForm(true)}
         >
           新增專案
         </button>
       </div>
 
-      {showForm && !editing && (
+      {showForm && (
         <div className="card">
           <h3>新增專案</h3>
           <ProjectForm onSuccess={() => setShowForm(false)} onCancel={() => setShowForm(false)} />
-        </div>
-      )}
-
-      {editing && (
-        <div className="card">
-          <h3>編輯專案</h3>
-          <ProjectForm
-            project={editing}
-            onSuccess={() => setEditing(null)}
-            onCancel={() => setEditing(null)}
-          />
         </div>
       )}
 
@@ -141,8 +127,7 @@ export default function ProjectList() {
               type="button"
               className="btn"
               onClick={() => {
-                setShowForm(false);
-                setEditing(p);
+                navigate(`/projects/${p.id}`);
               }}
             >
               編輯
