@@ -58,6 +58,17 @@ body {
 .btn-danger:hover {
   background: #b71c1c;
 }
+.btn-icon {
+  padding: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: auto;
+}
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .card {
   background: #fff;
   border-radius: 8px;

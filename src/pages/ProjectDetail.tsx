@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Pencil, Trash2, UserMinus } from 'lucide-react';
 import { useProject } from '@/hooks/useProject';
 import {
   useDeadlines,
@@ -309,8 +310,8 @@ export default function ProjectDetail() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <h2 style={{ margin: 0 }}>{project.name}</h2>
               {isOwner && (
-                <button type="button" className="btn" onClick={handleEditProject}>
-                  編輯
+                <button type="button" className="btn btn-icon" onClick={handleEditProject} title="編輯專案">
+                  <Pencil size={18} />
                 </button>
               )}
             </div>
@@ -410,24 +411,26 @@ export default function ProjectDetail() {
                 <div>
                   <button
                     type="button"
-                    className="btn"
+                    className="btn btn-icon"
                     onClick={() => {
                       setShowDeadlineForm(false);
                       setEditingDeadline(d);
                     }}
+                    title="編輯"
                   >
-                    編輯
+                    <Pencil size={18} />
                   </button>
                   <button
                     type="button"
-                    className="btn btn-danger"
+                    className="btn btn-icon btn-danger"
                     onClick={async () => {
                       if (window.confirm('確定刪除此截止日？')) {
                         await deleteDeadline.mutateAsync({ id: d.id, project_id: projectId });
                       }
                     }}
+                    title="刪除"
                   >
-                    刪除
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </li>
@@ -678,10 +681,11 @@ export default function ProjectDetail() {
                 </span>
                 <button
                   type="button"
-                  className="btn btn-danger"
+                  className="btn btn-icon btn-danger"
                   onClick={() => removeMember.mutate({ projectId: projectId!, userId: m.user_id })}
+                  title="移除成員"
                 >
-                  移除
+                  <UserMinus size={18} />
                 </button>
               </li>
             ))}

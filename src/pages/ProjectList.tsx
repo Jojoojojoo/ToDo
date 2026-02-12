@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
 import type { Project } from '@/types/database';
 
@@ -125,23 +126,25 @@ export default function ProjectList() {
           <div>
             <button
               type="button"
-              className="btn"
+              className="btn btn-icon"
               onClick={() => {
                 navigate(`/projects/${p.id}`);
               }}
+              title="編輯"
             >
-              編輯
+              <Pencil size={18} />
             </button>
             <button
               type="button"
-              className="btn btn-danger"
+              className="btn btn-icon btn-danger"
               onClick={async () => {
                 if (window.confirm(`確定要刪除專案「${p.name}`)) {
                   await deleteProject.mutateAsync(p.id);
                 }
               }}
+              title="刪除"
             >
-              刪除
+              <Trash2 size={18} />
             </button>
           </div>
         </div>
