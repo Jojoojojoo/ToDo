@@ -10,6 +10,7 @@ import {
 import { useExtractDeadlinesFromText, useConfirmSuggestedDeadlines } from '@/hooks/useDocumentExtract';
 import { useProjectMembers, useAddProjectMember, useRemoveProjectMember, useInviteProfiles } from '@/hooks/useProjectMembers';
 import { useNotificationRule, useUpsertNotificationRule, getDefaultRule } from '@/hooks/useNotificationRules';
+import { useUpdateProject } from '@/hooks/useProjects';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { extractTextFromFile } from '@/lib/extractFileText';
@@ -205,6 +206,7 @@ export default function ProjectDetail() {
   const deleteDeadline = useDeleteDeadline();
   const addMember = useAddProjectMember();
   const removeMember = useRemoveProjectMember();
+  const updateProject = useUpdateProject();
 
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
@@ -221,6 +223,11 @@ export default function ProjectDetail() {
   const { data: notificationRule } = useNotificationRule(projectId);
   const upsertRule = useUpsertNotificationRule(projectId);
   const defaultRule = getDefaultRule();
+  
+  // 專案編輯狀態
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [editProjectName, setEditProjectName] = useState('');
+  const [editProjectDescription, setEditProjectDescription] = useState('');
 
   if (projectLoading || !projectId) {
     return <div>載入中…</div>;
@@ -256,6 +263,37 @@ export default function ProjectDetail() {
     }
   }
 
+  // 編輯專案處理
+  async function handleEditProject() {
+    setEditProjectName(project!.name);
+    setEditProjectDescription(project!.description || '');
+    setIsEditingProject(true);
+  }
+
+  async function handleSaveProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editProjectName.trim()) {
+      alert('專案名稱不可為空');
+      return;
+    }
+    try {
+      await updateProject.mutateAsync({
+        id: projectId!,
+        name: editProjectName.trim(),
+        description: editProjectDescription.trim() || undefined,
+      });
+      setIsEditingProject(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '更新專案失敗');
+    }
+  }
+
+  function handleCancelEditProject() {
+    setIsEditingProject(false);
+    setEditProjectName('');
+    setEditProjectDescription('');
+  }
+
   return (
     <>
       <div style={{ marginBottom: '1rem' }}>
@@ -263,9 +301,55 @@ export default function ProjectDetail() {
           ← 回專案列表
         </button>
       </div>
+      
+      {/* 專案資訊區塊 */}
       <div className="card">
-        <h2>{project.name}</h2>
-        {project.description && <p style={{ color: '#666' }}>{project.description}</p>}
+        {!isEditingProject ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ margin: 0 }}>{project.name}</h2>
+              {isOwner && (
+                <button type="button" className="btn" onClick={handleEditProject}>
+                  編輯
+                </button>
+              )}
+            </div>
+            {project.description && <p style={{ color: '#666', margin: 0 }}>{project.description}</p>}
+          </>
+        ) : (
+          <form onSubmit={handleSaveProject}>
+            <div className="form-group">
+              <label>專案名稱 *</label>
+              <input
+                type="text"
+                value={editProjectName}
+                onChange={(e) => setEditProjectName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>專案說明</label>
+              <textarea
+                value={editProjectDescription}
+                onChange={(e) => setEditProjectDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary" disabled={updateProject.isPending}>
+                {updateProject.isPending ? '儲存中…' : '儲存'}
+              </button>
+              <button type="button" className="btn" onClick={handleCancelEditProject}>
+                取消
+              </button>
+            </div>
+            {updateProject.error && (
+              <div className="error">
+                {updateProject.error instanceof Error ? updateProject.error.message : '更新失敗'}
+              </div>
+            )}
+          </form>
+        )}
       </div>
 
       {/* 截止日區塊 */}

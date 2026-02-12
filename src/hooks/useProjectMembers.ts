@@ -35,6 +35,8 @@ export function useProjectMembers(projectId: string | undefined) {
       })) as ProjectMemberWithProfile[];
     },
     enabled: !!projectId,
+    staleTime: 60 * 1000, // 60 秒內不重新請求（成員變動頻率低）
+    gcTime: 10 * 60 * 1000, // 快取保留 10 分鐘
   });
 }
 
@@ -82,6 +84,7 @@ export function useInviteProfiles(projectId: string | undefined, enabled: boolea
       return (data ?? []) as InviteProfile[];
     },
     enabled: !!projectId && enabled,
+    staleTime: 30 * 1000, // 30 秒內不重新請求
   });
 }
 
