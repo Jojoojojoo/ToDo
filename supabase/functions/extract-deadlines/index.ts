@@ -41,13 +41,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // 取得當前年度，用於補齊沒有年度的日期
+    const currentYear = new Date().getFullYear();
+    
     const systemPrompt = `你是一個專案截止日擷取助手。請從使用者提供的文件或文字中，找出所有與「專案、里程碑、截止日、繳交期限、到期日」相關的項目。
 請「只」回傳一個 JSON 陣列，每個項目必須包含：
 - title: string（簡短標題，例如「報告繳交」「合約到期」）
-- due_date: string（僅日期，格式一律 YYYY-MM-DD；若原文只有月份或年份，請合理推斷為該月/年之最後一天或第一日）
+- due_date: string（僅日期，格式一律 YYYY-MM-DD；若原文沒有年度，請使用 ${currentYear} 年；若只有月份，請合理推斷為該月之最後一天或第一日）
 - description: string 或 null（可選，該項目的補充說明）
 - assignee_name: string 或 null（可選，若內文有提到負責人姓名則填入，否則 null）
 
+重要：若日期中沒有明確的年度，請一律使用 ${currentYear} 年。
 若完全找不到任何截止日或期限，請回傳空陣列 []。
 不要回傳 markdown、程式碼區塊標記或其它前後綴，僅純 JSON 陣列。`;
 
@@ -88,12 +92,30 @@ Deno.serve(async (req: Request) => {
       const parsed = JSON.parse(rawText) as unknown;
       const arr = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown[] })?.items ?? [];
       suggestions = Array.isArray(arr)
-        ? arr.map((item: Record<string, unknown>) => ({
-            title: String(item?.title ?? ""),
-            due_date: String(item?.due_date ?? ""),
-            description: item?.description != null ? String(item.description) : null,
-            assignee_name: item?.assignee_name != null ? String(item.assignee_name) : null,
-          }))
+        ? arr.map((item: Record<string, unknown>) => {
+            let dueDate = String(item?.due_date ?? "");
+            
+            // 若日期格式不完整或沒有年度，自動補上當前年度
+            if (dueDate) {
+              // 處理 MM-DD 格式（缺年度）
+              if (/^\d{1,2}-\d{1,2}$/.test(dueDate)) {
+                const [month, day] = dueDate.split('-');
+                dueDate = `${currentYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+              // 處理 YYYY-M-D 格式（月日需補零）
+              else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dueDate)) {
+                const parts = dueDate.split('-');
+                dueDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+              }
+            }
+            
+            return {
+              title: String(item?.title ?? ""),
+              due_date: dueDate,
+              description: item?.description != null ? String(item.description) : null,
+              assignee_name: item?.assignee_name != null ? String(item.assignee_name) : null,
+            };
+          })
         : [];
     } catch {
       suggestions = [];
