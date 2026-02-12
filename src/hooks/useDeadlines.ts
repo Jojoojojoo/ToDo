@@ -10,13 +10,14 @@ export function useDeadlines(projectId: string | undefined) {
       if (!projectId) return [];
       const { data, error } = await supabase
         .from('deadlines')
-        .select('*')
+        .select('id, project_id, title, due_date, description, source, document_extract_id, assignee_id, created_at, updated_at')
         .eq('project_id', projectId)
         .order('due_date', { ascending: true });
       if (error) throw error;
       return data as Deadline[];
     },
     enabled: !!projectId,
+    staleTime: 10 * 1000, // 10 秒內不重新請求
   });
 }
 

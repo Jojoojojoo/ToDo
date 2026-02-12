@@ -10,12 +10,13 @@ export function useProject(projectId: string | undefined) {
       if (!projectId) throw new Error('缺少專案 ID');
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select('id, name, description, owner_id, created_at, updated_at')
         .eq('id', projectId)
         .single();
       if (error) throw error;
       return data as Project;
     },
     enabled: !!projectId,
+    staleTime: 30 * 1000, // 30 秒內不重新請求
   });
 }

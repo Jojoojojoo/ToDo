@@ -12,13 +12,14 @@ export function useNotificationRule(projectId: string | undefined) {
       if (!projectId) return null;
       const { data, error } = await supabase
         .from('notification_rules')
-        .select('*')
+        .select('project_id, days_before, notify_line, notify_email, created_at, updated_at')
         .eq('project_id', projectId)
         .maybeSingle();
       if (error) throw error;
       return data as NotificationRule | null;
     },
     enabled: !!projectId,
+    staleTime: 60 * 1000, // 60 秒內不重新請求
   });
 }
 

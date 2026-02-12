@@ -1,0 +1,56 @@
+===============================================
+請在 Supabase Dashboard 執行以下 SQL
+===============================================
+
+Supabase Dashboard 已開啟：
+https://supabase.com/dashboard/project/aqhmnrwxglfmewsgvtzs/sql/new
+
+請複製以下 SQL 並在 SQL Editor 中執行（點擊 Run 按鈕）：
+
+===============================================
+開始複製（從下一行開始）
+===============================================
+
+-- 1. 新增索引
+create index if not exists idx_projects_owner_id on public.projects (owner_id);
+create index if not exists idx_project_members_user_id on public.project_members (user_id);
+create index if not exists idx_project_members_project_id on public.project_members (project_id);
+create index if not exists idx_projects_updated_at_desc on public.projects (updated_at desc);
+
+-- 2. 優化 RLS 政策
+drop policy if exists "projects_select" on public.projects;
+
+create policy "projects_select" on public.projects
+  for select using (
+    auth.uid() = owner_id
+    or
+    exists (
+      select 1 
+      from public.project_members pm
+      where pm.project_id = projects.id 
+        and pm.user_id = auth.uid()
+    )
+  );
+
+-- 3. 驗證索引已建立
+select 
+  tablename,
+  indexname
+from pg_indexes
+where schemaname = 'public'
+  and tablename in ('projects', 'project_members')
+order by tablename, indexname;
+
+===============================================
+複製結束（到上一行為止）
+===============================================
+
+執行後應該看到：
+✓ Success (可能顯示 "No rows returned" 或顯示索引列表)
+
+如果執行成功，請繼續：
+1. 重新啟動開發伺服器：npm run dev
+2. 開啟瀏覽器：http://localhost:5173
+3. 測試載入速度（應該 < 1 秒）
+
+===============================================

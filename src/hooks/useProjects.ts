@@ -9,11 +9,15 @@ export function useProjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select('id, name, description, owner_id, created_at, updated_at')
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return Array.isArray(data) ? (data as Project[]) : [];
     },
+    // 啟用快取：資料在 30 秒內不會重新請求
+    staleTime: 30 * 1000,
+    // 快取保留 5 分鐘
+    gcTime: 5 * 60 * 1000,
   });
 }
 
