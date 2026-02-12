@@ -356,20 +356,20 @@ export default function ProjectDetail() {
       <div className="card">
         <h3>從文件擷取截止日</h3>
         <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
-          貼上文字或上傳 .txt / .pdf，由 AI 辨識專案／里程碑／截止日後，可勾選並寫入上方截止日列表。
+          貼上文字或上傳 .txt / .pdf / .xlsx，由 AI 辨識專案／里程碑／截止日後，可勾選並寫入上方截止日列表。
         </p>
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ display: 'block', marginBottom: '0.25rem' }}>文字或選擇檔案</label>
           <textarea
             value={extractText}
             onChange={(e) => setExtractText(e.target.value)}
-            placeholder="貼上文件內容，或選擇 .txt / .pdf 檔案後會自動填入"
+            placeholder="貼上文件內容，或選擇 .txt / .pdf / .xlsx 檔案後會自動填入"
             rows={5}
             style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
           />
           <input
             type="file"
-            accept=".txt,.pdf"
+            accept=".txt,.pdf,.xlsx,.xls"
             style={{ marginTop: '0.5rem' }}
             onChange={async (e) => {
               const f = e.target.files?.[0];
